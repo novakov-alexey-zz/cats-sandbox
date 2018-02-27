@@ -7,32 +7,32 @@ trait Printable[A] {
 }
 
 object Printable {
-  def format[A](value: A)(implicit printable: Printable[A]): String =
+  def format[A](value: A)(implicit printable: functor.Printable[A]): String =
     printable.format(value)
 
-  def print[A](value: A)(implicit printable: Printable[A]): Unit =
+  def print[A](value: A)(implicit printable: functor.Printable[A]): Unit =
     println(format(value))
 }
 
 object PrintableSyntax {
   implicit class PrintableOps[A](a: A) {
-    def format(implicit printable: Printable[A]): String = printable.format(a)
-    def print(implicit printable: Printable[A]): Unit = println(printable.format(a))
+    def format(implicit printable: functor.Printable[A]): String = printable.format(a)
+    def print(implicit printable: functor.Printable[A]): Unit = println(printable.format(a))
   }
 }
 
 final case class Cat(name: String, age: Int, color: String)
 
 object PrintableInstances {
-  implicit val stringPrintable = new Printable[String] {
+  implicit val stringPrintable = new functor.Printable[String] {
     override def format(value: String): String = "s." + value
   }
 
-  implicit val intPrintable = new Printable[Int] {
+  implicit val intPrintable = new functor.Printable[Int] {
     override def format(value: Int): String = "i." + value.toString
   }
 
-  implicit val catPrintable = new Printable[Cat] {
+  implicit val catPrintable = new functor.Printable[Cat] {
     override def format(value: Cat): String =
       s"${value.name} is a ${value.age} year-old ${value.color} cat."
   }
