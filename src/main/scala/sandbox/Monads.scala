@@ -1,9 +1,11 @@
 package sandbox
 
 import cats.Eval
-import cats.data.{Reader, Writer}
+import cats.data.{Reader, StateT, Writer}
+import sandbox.functor.{Branch, Leaf, Tree}
 
 import scala.language.higherKinds
+import scala.util.{Failure, Success, Try}
 
 class Monads {
   type Id[A] = A
@@ -107,8 +109,8 @@ object Readers extends App {
     3 -> "margo"
   )
   val passwords = Map(
-    "dade"  -> "zerocool",
-    "kate"  -> "acidburn",
+    "dade" -> "zerocool",
+    "kate" -> "acidburn",
     "margo" -> "secret"
   )
 
@@ -116,4 +118,103 @@ object Readers extends App {
 
   println(checkLogin(1, "zerocool").run(db))
   println(checkLogin(4, "davinci").run(db))
+}
+
+object States extends App {
+
+  import cats.data.State
+  import cats.syntax.applicative._ // for pure
+
+  type CalcState[A] = State[List[Int], A]
+
+  def evalOne(sym: String): CalcState[Int] =
+    State(stack => {
+      Try(sym.toInt) match {
+        case Success(v) => (v :: stack, v)
+        case Failure(_) =>
+          val r = calculate(sym, stack)
+          val newSTack = stack.dropRight(2)
+          (r :: newSTack, r)
+      }
+    })
+
+  def evalAll(input: List[String]): CalcState[Int] =
+    input.foldLeft(0.pure[CalcState])((s, str) => s.flatMap(_ => evalOne(str)))
+
+  private def calculate(sym: String, stack: List[Int]) = {
+    stack match {
+      case a :: b :: _ =>
+        sym match {
+          case "+" => a + b
+          case "-" => a - b
+          case "/" => a / b
+          case "*" => a * b
+          case op => throw new IllegalArgumentException(s"$op is unknown operator")
+        }
+      case _ => sys.error("Fail! Calculation requires at least two operands")
+    }
+  }
+
+  def evalInput(s: String): Int = {
+    evalAll(s.split(" ").toList).runA(Nil).value
+  }
+
+  val program: StateT[Eval, List[Int], Int] = for {
+    _ <- evalOne("1")
+    _ <- evalOne("2")
+    ans <- evalOne("+")
+  } yield ans
+
+  //  println(program.runA(Nil).value)
+  val program2 = evalAll(List("1", "2", "+", "3", "*"))
+  //  println(program2.runA(Nil).value)
+
+  val program3 = for {
+    _ <- evalAll(List("1", "2", "+"))
+    _ <- evalAll(List("3", "4", "+"))
+    ans <- evalOne("*")
+  } yield ans
+
+  //println(program3.runA(Nil).value)
+  println(evalInput("1 2 + 3 4 + *"))
+}
+
+object CustomMonad extends App {
+  import Tree._
+  import cats.syntax.functor._ // for map
+  import cats.syntax.flatMap._
+
+  implicit val treeM = new cats.Monad[Tree] {
+
+    override def flatMap[A, B](fa: Tree[A])(f: A => Tree[B]): Tree[B] =
+      fa match {
+        case Branch(l, r) => Tree.branch(flatMap(l)(f), flatMap(r)(f))
+        case Leaf(a) => f(a)
+      }
+
+    override def tailRecM[A, B](a: A)(f: A => Tree[Either[A, B]]): Tree[B] = {
+      f(a) match {
+        case Leaf(Left(a1)) => tailRecM(a1)(f)
+        case Leaf(Right(v)) => Leaf(v)
+        case Branch(lt, rt) => Branch(
+          flatMap(lt) {
+            case Left(l) => tailRecM(l)(f)
+            case Right(l) => pure(l)
+          },
+          flatMap(rt) {
+            case Left(r) => tailRecM(r)(f)
+            case Right(r) => pure(r)
+          }
+        )
+      }
+    }
+
+    override def pure[A](x: A): Tree[A] = Leaf(x)
+  }
+
+  val tree: Tree[Int] = for {
+    a <- branch(leaf(100), leaf(200))
+    b <- branch(leaf(a - 10), leaf(a + 10))
+    c <- branch(leaf(b - 1), leaf(b + 1))
+  } yield c
 }
