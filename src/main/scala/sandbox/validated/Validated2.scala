@@ -37,5 +37,5 @@ object Validated2 extends App {
     (
       readName(data).toValidated,
       readAge(data).toValidated
-    ).mapN { case (s, i) => User.apply(s, i)}
+    ).mapN { case (s, i) => User(s, i)}
 }
