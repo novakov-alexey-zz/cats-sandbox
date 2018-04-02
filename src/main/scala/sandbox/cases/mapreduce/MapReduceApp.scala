@@ -2,7 +2,12 @@ package sandbox.cases.mapreduce
 
 import cats.Monoid
 import cats.instances.int._
-import cats.syntax.semigroup._
+import cats.instances.vector._
+import cats.instances.future._
+
+import cats.syntax.semigroup._ // for |+|
+import cats.syntax.foldable._ // for combineAll and foldMap
+import cats.syntax.traverse._ // for traverse
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -16,15 +21,14 @@ object MapReduceApp extends App {
   }
 
   def parallelFoldMap[A, B: Monoid](values: Vector[A])(func: A => B): Future[B] = {
-    val bs = values.grouped(values.length / cores).map(b => Future(foldMap(b)(func)))
-    Future.sequence(bs).map { it =>
-      foldMap(it.toVector)(identity)
-    }
+    val groupSize = values.length / cores
+    val bs = values.grouped(groupSize).toVector.traverse(b => Future(b.toVector.foldMap(func)))
+    bs.map(_.combineAll)
   }
 
-  //  println(foldMap(Vector(1, 2, 3))(_.toString + "! "))
-  //  println(foldMap(Vector(1, 2, 3))(identity))
-  //  println(foldMap("Hello world!".toVector)(_.toString.toUpperCase))
+  //println(foldMap(Vector(1, 2, 3))(_.toString + "! "))
+  //println(foldMap(Vector(1, 2, 3))(identity))
+  //println(foldMap("Hello world!".toVector)(_.toString.toUpperCase))
 
   val result = parallelFoldMap((1 to 1000000).toVector)(identity)
   println(Await.result(result, 1.second))
