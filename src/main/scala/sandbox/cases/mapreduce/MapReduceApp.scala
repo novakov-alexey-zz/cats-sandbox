@@ -22,7 +22,7 @@ object MapReduceApp extends App {
 
   def parallelFoldMap[A, B: Monoid](values: Vector[A])(func: A => B): Future[B] = {
     val groupSize = values.length / cores
-    val bs = values.grouped(groupSize).toVector.traverse(b => Future(b.toVector.foldMap(func)))
+    val bs = values.grouped(groupSize).toVector.traverse(group => Future(group.foldMap(func)))
     bs.map(_.combineAll)
   }
 
