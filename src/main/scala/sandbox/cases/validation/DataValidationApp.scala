@@ -1,13 +1,10 @@
 package sandbox.cases.validation
 
-import cats.data.Validated.{Invalid, Valid}
 import cats.instances.list._
 import cats.syntax.either._
 import cats.Semigroup
 import cats.data.Validated
 import cats.syntax.semigroup._ // for |+|
-import cats.syntax.apply._     // for mapN
-//import cats.syntax.apply._     // for mapN
 
 sealed trait Check[E, A, B] {
   def apply(a: A)(implicit s: Semigroup[E]): Validated[E, B]
